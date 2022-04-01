@@ -17,6 +17,7 @@ import Bio.SeqIO
 
 # We assume BLAST writes to STDOUT with default system encoding?
 BLAST_ENCODING = sys.getdefaultencoding()
+GAPCHAR = '-'  # Assume dash used for length-1 gap (in IUPAC actually specified as undefined length)
 # Note: 'qstrand' doesn't exist in BLAST... we'll have to derive it from start and end positions.
 BLAST_OUTFIELDS = ['qacc', 'sacc', 'qstart', 'qend', 'sstart', 'send', 'sstrand', 'qseq', 'sseq', 'slen']
 
@@ -29,6 +30,8 @@ def run(
     dbdir: str,
     out: typing.TextIO,
     fsep: str,
+    min_perc_ident: float,
+    min_perc_cov: float,
 ):
     dbdir = os.path.abspath(os.path.expanduser(os.path.expandvars(dbdir)))
     if not check_db(references=references, dbdir=dbdir):
@@ -38,7 +41,7 @@ def run(
     contig_fasta = make_contigs_fasta(contig_mapping=contig_mapping)
     results = list(run_blast(query=contig_fasta, db_basepath=db_basepath))
     results = iter_norm_extend_seqs(contig_mapping=contig_mapping, results=results)
-    results = filter_blast_results(results=results)
+    results = filter_blast_results(results=results, min_perc_ident=min_perc_ident, min_perc_cov=min_perc_cov)
     for result in results:
         out.write(f">{result.sacc}\n{result.qseq}\n")
 
@@ -169,10 +172,31 @@ def _extend_result_qry_end(result: 'BlastResult', positions: int, qsrcseq: str):
     )
 
 
-def filter_blast_results(results: typing.Iterable['BlastResult']) -> typing.Iterable['BlastResult']:
+def filter_blast_results(results: typing.Iterable['BlastResult'], min_perc_ident: float, min_perc_cov: float) -> typing.Iterable['BlastResult']:
     for result in results:
-        # TODO: perc_ident and perc_cov filtering
+        perc_ident, perc_cov = _calc_perc_ident_cov(qry=result.qseq, subj=result.sseq)
+        if perc_ident < min_perc_ident:
+            continue
+        if perc_cov < min_perc_cov:
+            continue
         yield result
+
+
+def _calc_perc_ident_cov(qry: str, subj: str):
+    # Assuming nucleotide sequences, 1 for exact equals, 0 otherwise (no intermediate for IUPAC).
+    # Assuming both sequences are equal length, strict zip will raise error otherwise.
+    # Assuming qry and subj never both have a gap character at the same position.
+    ident_length = len(qry)
+    cov_length = 0
+    ident_score = 0
+    cov_score = 0
+    for qry_c, subj_c in zip(qry, subj, strict=True):
+        ident_score += qry_c == subj_c
+        cov_score += qry_c != GAPCHAR and subj_c != GAPCHAR  # Note: Only count coverage where subject does not have gap (=> insert may not compensate deletion!)
+        cov_length += subj_c != GAPCHAR
+    perc_ident = ident_score / ident_length * 100.0
+    perc_cov = cov_score / cov_length * 100.0
+    return perc_ident, perc_cov
 
 
 def make_contigs_fasta(contig_mapping: dict[str, str]) -> str:
@@ -278,6 +302,8 @@ def get_argparser():
     parser.add_argument('--dbdir', '-d', default=os.getcwd(), help="The directory for BLAST databases, defaults to working directory")
     parser.add_argument('--out', '-o', type=argparse.FileType('w'), default=sys.stdout, help="The output destination, defaults to STDOUT")
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
+    parser.add_argument('--pident', default=80.0, type=float, help="Minimum percent identity for results")
+    parser.add_argument('--pcov', default=80.0, type=float, help="Minimum percent coverage for results")
     parser.add_argument('genome', help='The FASTA format input assembled genome, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
     return parser
 
@@ -291,6 +317,8 @@ def main(args: list[str]):
         dbdir=ns.dbdir,
         out=ns.out,
         fsep=ns.fsep,
+        min_perc_ident=ns.pident,
+        min_perc_cov=ns.pcov
     )
 
 
