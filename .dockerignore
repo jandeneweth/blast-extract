@@ -1,0 +1,6 @@
+# Ignore everything except what's relevant
+*
+
+# For building
+!scripts/
+!requirements.txt
