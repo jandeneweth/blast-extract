@@ -1,0 +1,8 @@
+# IDEs
+.idea/
+
+# Python virtual environment
+venv/
+
+internal/
+tests/
