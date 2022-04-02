@@ -66,7 +66,7 @@ def main(args: list[str] | None = None):
     parser = get_argparser()
     ns = parser.parse_args(args=args)
     run(
-        fh=ns.alleles,
+        fh=ns.ALLELES,
         out=ns.out,
         algorithm=ns.algorithm,
         hash_trim=ns.hash_trim,

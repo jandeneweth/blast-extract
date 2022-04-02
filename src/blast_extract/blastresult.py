@@ -84,11 +84,18 @@ class BlastResult:
             )
             yield result
 
-    def normalize_and_extend(self) -> 'BlastResult':
-        """Normalize strand and extend the sequences to cover as much of the full subject sequence as possible."""
+    def normalize(self) -> 'BlastResult':
+        """Normalize the sequences to be relative to the 'plus' subject strand."""
         result = self
-        if self.sstrand == 'minus':  # On reverse complement => normalize
+        if self.sstrand == 'minus':
             result = self._revcomp_result(result=result)
+        return result
+
+    def extend(self) -> 'BlastResult':
+        """Extend the sequences to cover as much of the full subject sequence as possible."""
+        result = self
+        if result.sstrand != 'plus':
+            raise ValueError("Can only extend a normalized result.")
         if result.sstart > 1:  # Missing start
             result = self._extend_result_qry_start(
                 result=result,
