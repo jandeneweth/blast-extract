@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Extract alleles from a FASTA input file based on reference loci.
 """
@@ -52,7 +51,7 @@ def get_argparser():
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
     parser.add_argument('--pident', default=80.0, type=float, help="Minimum percent identity for results")
     parser.add_argument('--pcov', default=80.0, type=float, help="Minimum percent coverage for results")
-    parser.add_argument('genome', help='The FASTA format input assembled genome, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
+    parser.add_argument('GENOME', help='The FASTA format input assembled genome, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
     return parser
 
 

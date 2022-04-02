@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Hash a FASTA-format file of alleles.
 """
@@ -54,12 +53,12 @@ def run(fh: typing.TextIO, out: typing.TextIO, algorithm: str = 'md5', hash_trim
 
 def get_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('alleles', help='The FASTA format input of alleles, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
     parser.add_argument('--algorithm', '-a', default='md5', type=str, help="The hashing algorithm used")
     parser.add_argument('--hash_trim', '-t', default=None, type=int, help="If specified, the hexadecimal representation of the output hashes are trimmed to the first X characters")
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
     parser.add_argument('--field', '-f', default=1, type=int, help="The field in which the locus name can be found, starting at 1")
     parser.add_argument('--out', '-o', type=argparse.FileType('w'), default=sys.stdout, help="The output destination, defaults to STDOUT")
+    parser.add_argument('ALLELES', help='The FASTA format input of alleles, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
     return parser
 
 

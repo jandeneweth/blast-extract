@@ -26,7 +26,7 @@ def _maketrans(complement_mapping):
     return bytes.maketrans(keys + keys.lower(), values + values.lower())
 
 
-ambiguous_dna_complement = {
+_ambiguous_dna_complement = {
     "A": "T",
     "C": "G",
     "G": "C",
@@ -44,12 +44,12 @@ ambiguous_dna_complement = {
     "X": "X",
     "N": "N",
 }
-_dna_complement_table = _maketrans(ambiguous_dna_complement)
+_dna_complement_table = _maketrans(_ambiguous_dna_complement)
 
 
 # <<< End of Biopython
 
-class Contig:
+class Sequence:
 
     def __init__(self, name: str, fwdseq: str):
         self.name = name
@@ -58,19 +58,19 @@ class Contig:
         self.length = len(self.fwdseq)
 
 
-def make_contigs_fasta(contigs: t.Iterable['Contig']) -> str:
+def make_contigs_fasta(contigs: t.Iterable['Sequence']) -> str:
     result = ''
     for contig in contigs:
         result += f">{contig.name}\n{contig.fwdseq}\n"
     return result
 
 
-def parse_genome_contigs(genome: t.TextIO, fsep) -> dict[str, 'Contig']:
+def parse_genome_contigs(genome: t.TextIO, fsep) -> dict[str, 'Sequence']:
     """Parse a genome fasta file into a mapping of contig names and sequences."""
     contig_mapping = dict()
     for header, seq in parse_fasta(genome):
         name = header.split(fsep, 1)[0]  # First value in header assumed to be contig name
-        contig_mapping[name] = Contig(name=name, fwdseq=seq)
+        contig_mapping[name] = Sequence(name=name, fwdseq=seq)
     return contig_mapping
 
 

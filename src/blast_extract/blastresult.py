@@ -27,7 +27,7 @@ class BlastResult:
             qseq: str,
             sseq: str,
             slen: int,
-            qcontig: 'seqtools.Contig',
+            qcontig: 'seqtools.Sequence',
     ):
         self.qacc = qacc
         self.sacc = sacc
@@ -65,7 +65,7 @@ class BlastResult:
         return self._perc_cov
 
     @classmethod
-    def from_output(cls, output: str, contig_mapping: dict[str, 'seqtools.Contig']) -> t.Generator['BlastResult', None, None]:
+    def from_output(cls, output: str, contig_mapping: dict[str, 'seqtools.Sequence']) -> t.Generator['BlastResult', None, None]:
         """Create results from blastn output."""
         for line in output.splitlines():
             fields = line.split('\t')

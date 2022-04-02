@@ -18,7 +18,7 @@ BLAST_ENCODING = sys.getdefaultencoding()
 def run_blast(
         db_basepath: str,
         query: str,
-        contig_mapping: dict[str, 'seqtools.Contig'],
+        contig_mapping: dict[str, 'seqtools.Sequence'],
         perc_ident_guideline: float | None = None,
 ) -> t.Iterable['blastresult.BlastResult']:
     args = ['blastn', '-db', db_basepath, '-outfmt', blastresult.BlastResult.REQUIRED_OUTFMT, ]
