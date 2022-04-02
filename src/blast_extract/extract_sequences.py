@@ -6,29 +6,25 @@ Extract alleles from a FASTA input file based on reference loci.
 import os
 import sys
 import uuid
-import typing
 import argparse
 import subprocess
-import collections
+import typing as t
 
 import Bio.Seq
 import Bio.SeqIO
 
+from blast_extract import blastresult
+
 
 # We assume BLAST writes to STDOUT with default system encoding?
 BLAST_ENCODING = sys.getdefaultencoding()
-GAPCHAR = '-'  # Assume dash used for length-1 gap (in IUPAC actually specified as undefined length)
-# Note: 'qstrand' doesn't exist in BLAST... we'll have to derive it from start and end positions.
-BLAST_OUTFIELDS = ['qacc', 'sacc', 'qstart', 'qend', 'sstart', 'send', 'sstrand', 'qseq', 'sseq', 'slen']
-
-BlastResult = collections.namedtuple('BlastResult', BLAST_OUTFIELDS)
 
 
 def run(
     references: str,
-    genome: typing.TextIO,
+    genome: t.TextIO,
     dbdir: str,
-    out: typing.TextIO,
+    out: t.TextIO,
     fsep: str,
     min_perc_ident: float,
     min_perc_cov: float,
@@ -38,190 +34,47 @@ def run(
         make_db(references=references, dbdir=dbdir)
     db_basepath = get_db_basepath(references=references, dbdir=dbdir)
     contig_mapping = parse_genome_contigs(genome=genome, fsep=fsep)
-    contig_fasta = make_contigs_fasta(contig_mapping=contig_mapping)
-    results = list(run_blast(query=contig_fasta, db_basepath=db_basepath))
-    results = iter_norm_extend_seqs(contig_mapping=contig_mapping, results=results)
+    contig_fasta = make_contigs_fasta(contigs=contig_mapping.values())
+    results = list(run_blast(query=contig_fasta, db_basepath=db_basepath, contig_mapping=contig_mapping))
+    results = [r.normalize_and_extend() for r in results]
     results = filter_blast_results(results=results, min_perc_ident=min_perc_ident, min_perc_cov=min_perc_cov)
     for result in results:
         out.write(f">{result.sacc}\n{result.qseq}\n")
 
 
-def iter_norm_extend_seqs(contig_mapping: dict[str, str], results: typing.Iterable['BlastResult']) -> typing.Iterable:
-    """Normalize strand and extend query sequences."""
+def filter_blast_results(results: t.Iterable['blastresult.BlastResult'], min_perc_ident: float, min_perc_cov: float) -> t.Iterable['blastresult.BlastResult']:
     for result in results:
-        assert result.sstrand in ('minus', 'plus'), f"Unexpected sstrand: '{result.sstrand}'"
-        if result.sstrand == 'minus':  # On reverse complement => normalize
-            result = _revcomp_result(result=result)
-        qsrcseq = contig_mapping[result.qacc]
-        if result.sstart > 1:  # Missing start
-            result = _extend_result_qry_start(
-                result=result,
-                positions=result.sstart-1,
-                qsrcseq=qsrcseq
-            )
-        if result.send < result.slen:  # Missing end
-            result = _extend_result_qry_end(
-                result=result,
-                positions=result.slen-result.send,
-                qsrcseq=qsrcseq
-            )
-        yield result
-
-
-def _revcomp_result(result: 'BlastResult') -> 'BlastResult':
-    new_strand = 'plus' if result.sstrand == 'minus' else 'minus'
-    new_qseq = Bio.Seq.reverse_complement(result.qseq)
-    new_sseq = Bio.Seq.reverse_complement(result.sseq)
-    return BlastResult(
-        qacc=result.qacc,
-        sacc=result.sacc,
-        qstart=result.qend,  # Swapped
-        qend=result.qstart,  # Swapped
-        sstart=result.send,  # Swapped
-        send=result.sstart,  # Swapped
-        sstrand=new_strand,  # Switched
-        qseq=new_qseq,  # Reverse complemented
-        sseq=new_sseq,  # Reverse complemented
-        slen=result.slen
-    )
-
-
-def _extend_result_qry_start(result: 'BlastResult', positions: int, qsrcseq: str):
-    assert result.sstrand == 'plus', "Only use normalized references!"
-    # Reverse complement the query source sequence if needed
-    qstrand = 'plus' if result.qend >= result.qstart else 'minus'
-    if qstrand == 'minus':
-        qsrcseq = Bio.Seq.reverse_complement(qsrcseq)
-    # Determine maximal extendability and extension sequence
-    if qstrand == 'plus':
-        if positions > (result.qstart - 1):
-            positions = result.qstart - 1
-        # Account for python base-0 coord system, substract one from start
-        qsrcend = result.qstart-1
-        qext = qsrcseq[qsrcend-positions:qsrcend]
-        sext = '-' * positions
-        new_qstart = result.qstart - positions
-    elif qstrand == 'minus':
-        if positions > (len(qsrcseq) - result.qstart):
-            positions = len(qsrcseq) - result.qstart
-        # Ex.: Start pos 48 in len 50 seq is pos 3 in reverse complemented form (base-1 coord system), but substract one for python base-0 coord system => pos 2
-        qsrcend = len(qsrcseq) - result.qstart
-        qext = qsrcseq[qsrcend-positions:qsrcend]
-        sext = '-' * positions
-        new_qstart = result.qstart + positions
-    else:
-        raise AssertionError("Unhandled strand")
-    # Extend query and ref sequences, the latter one with gaps (dashes)
-    new_qseq = qext + result.qseq
-    new_sseq = sext + result.sseq
-    # Return new result
-    return BlastResult(
-        qacc=result.qacc,
-        sacc=result.sacc,
-        qstart=new_qstart,  # Moved 'up'
-        qend=result.qend,
-        sstart=result.sstart - positions,  # Moved 'up'
-        send=result.send,
-        sstrand=result.sstrand,
-        qseq=new_qseq,  # Extended
-        sseq=new_sseq,  # Extended
-        slen=result.slen
-    )
-
-
-def _extend_result_qry_end(result: 'BlastResult', positions: int, qsrcseq: str):
-    assert result.sstrand == 'plus', "Only use normalized references!"
-    # Reverse complement the query source sequence if needed
-    qstrand = 'plus' if result.qend >= result.qstart else 'minus'
-    if qstrand == 'minus':
-        qsrcseq = Bio.Seq.reverse_complement(qsrcseq)
-    # Determine maximal extendability and extension sequence
-    if qstrand == 'plus':
-        if positions > (len(qsrcseq) - result.qend):
-            positions = len(qsrcseq) - result.qend
-        # Account for python base-0 coord system, don't need to +1 for skipping a character
-        qsrcstart = result.qend
-        qext = qsrcseq[qsrcstart:qsrcstart+positions]
-        sext = '-' * positions
-        new_qend = result.qend + positions
-    elif qstrand == 'minus':
-        if positions > (result.qstart - 1):
-            positions = result.qstart - 1
-        # Ex.: End pos 5 in len 50 seq is pos 45 in reverse complemented form (base-1 coord system), still need to +1 for exclusion in base-0 coord system
-        qsrcstart = len(qsrcseq) - result.qend + 1
-        qext = qsrcseq[qsrcstart:qsrcstart+positions]
-        sext = '-' * positions
-        new_qend = result.qend - positions
-    else:
-        raise AssertionError("Unhandled strand")
-    # Extend query and ref sequences, the latter one with gaps (dashes)
-    new_qseq = qext + result.qseq
-    new_sseq = sext + result.sseq
-    # Return new result
-    return BlastResult(
-        qacc=result.qacc,
-        sacc=result.sacc,
-        qstart=result.qstart,
-        qend=new_qend,  # Moved 'down'
-        sstart=result.sstart,
-        send=result.send + positions,  # Moved 'down'
-        sstrand=result.sstrand,
-        qseq=new_qseq,  # Extended
-        sseq=new_sseq,  # Extended
-        slen=result.slen
-    )
-
-
-def filter_blast_results(results: typing.Iterable['BlastResult'], min_perc_ident: float, min_perc_cov: float) -> typing.Iterable['BlastResult']:
-    for result in results:
-        perc_ident, perc_cov = _calc_perc_ident_cov(qry=result.qseq, subj=result.sseq)
-        if perc_ident < min_perc_ident:
+        if result.perc_ident < min_perc_ident:
             continue
-        if perc_cov < min_perc_cov:
+        if result.perc_cov < min_perc_cov:
             continue
         yield result
 
 
-def _calc_perc_ident_cov(qry: str, subj: str):
-    # Assuming nucleotide sequences, 1 for exact equals, 0 otherwise (no intermediate for IUPAC).
-    # Assuming both sequences are equal length, strict zip will raise error otherwise.
-    # Assuming qry and subj never both have a gap character at the same position.
-    ident_length = len(qry)
-    cov_length = 0
-    ident_score = 0
-    cov_score = 0
-    for qry_c, subj_c in zip(qry, subj, strict=True):
-        ident_score += qry_c == subj_c
-        cov_score += qry_c != GAPCHAR and subj_c != GAPCHAR  # Note: Only count coverage where subject does not have gap (=> insert may not compensate deletion!)
-        cov_length += subj_c != GAPCHAR
-    perc_ident = ident_score / ident_length * 100.0
-    perc_cov = cov_score / cov_length * 100.0
-    return perc_ident, perc_cov
-
-
-def make_contigs_fasta(contig_mapping: dict[str, str]) -> str:
+def make_contigs_fasta(contigs: t.Iterable['blastresult.Contig']) -> str:
     result = ''
-    for name, seq in contig_mapping.items():
-        result += f">{name}\n{seq}\n"
+    for contig in contigs:
+        result += f">{contig.name}\n{contig.fwdseq}\n"
     return result
 
 
-def parse_genome_contigs(genome: typing.TextIO, fsep) -> dict[str, str]:
+def parse_genome_contigs(genome: t.TextIO, fsep) -> dict[str, 'blastresult.Contig']:
     """Parse a genome fasta file into a mapping of contig names and sequences."""
     contig_mapping = dict()
     for seqrecord in Bio.SeqIO.parse(genome, 'fasta'):
         name = seqrecord.description.split(fsep, 1)[0]  # First value in header assumed to be contig name
         seq = str(seqrecord.seq).lower()
-        contig_mapping[name] = seq
+        contig_mapping[name] = blastresult.Contig(name=name, fwdseq=seq)
     return contig_mapping
 
 
 def run_blast(
         query: str,
         db_basepath: str,
+        contig_mapping: dict[str, 'blastresult.Contig'],
         perc_ident_guideline: float | None = None,
-) -> typing.Iterable['BlastResult']:
-    args = ['blastn', '-db', db_basepath, '-outfmt', f'6 {" ".join(BLAST_OUTFIELDS)}', ]
+) -> t.Iterable['blastresult.BlastResult']:
+    args = ['blastn', '-db', db_basepath, '-outfmt', blastresult.BlastResult.REQUIRED_OUTFMT, ]
     if perc_ident_guideline:
         # Note: set 2% lower, since there may be extension before further filtering, which may influence the value
         args.extend(['--perc_ident', max(0.0, perc_ident_guideline - 2.0)])
@@ -234,24 +87,7 @@ def run_blast(
     )
     if result.returncode != 0 or result.stderr:
         raise RuntimeError(f"Error running BLAST: {result.stderr or '<no stderr>'} (returncode {result.returncode})")
-    results = []
-    for line in result.stdout.splitlines():
-        fields = line.split('\t')
-        raw = BlastResult(*fields)
-        result = BlastResult(
-            qacc=raw.qacc,
-            sacc=raw.sacc,
-            qstart=int(raw.qstart),
-            qend=int(raw.qend),
-            sstart=int(raw.sstart),
-            send=int(raw.send),
-            sstrand=raw.sstrand,
-            qseq=raw.qseq,
-            sseq=raw.sseq,
-            slen=int(raw.slen),
-        )
-        results.append(result)
-    return results
+    return blastresult.BlastResult.from_output(output=result.stdout, contig_mapping=contig_mapping)
 
 
 def make_db(references: str, dbdir: str):
