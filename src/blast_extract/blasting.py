@@ -8,6 +8,7 @@ import uuid
 import subprocess
 import typing as t
 
+from blast_extract import seqtools
 from blast_extract import blastresult
 
 # We assume BLAST writes to STDOUT with default system encoding?
@@ -17,7 +18,7 @@ BLAST_ENCODING = sys.getdefaultencoding()
 def run_blast(
         db_basepath: str,
         query: str,
-        contig_mapping: dict[str, 'blastresult.Contig'],
+        contig_mapping: dict[str, 'seqtools.Contig'],
         perc_ident_guideline: float | None = None,
 ) -> t.Iterable['blastresult.BlastResult']:
     args = ['blastn', '-db', db_basepath, '-outfmt', blastresult.BlastResult.REQUIRED_OUTFMT, ]
@@ -36,12 +37,12 @@ def run_blast(
     return blastresult.BlastResult.from_output(output=result.stdout, contig_mapping=contig_mapping)
 
 
-def make_db(references: str, dbdir: str):
+def make_db(refspath: str, dbdir: str):
     """Create the BLAST database for the references."""
-    db_basepath = get_db_basepath(references=references, dbdir=dbdir)
+    db_basepath = get_db_basepath(refspath=refspath, dbdir=dbdir)
     db_pardir = os.path.dirname(db_basepath)
     os.makedirs(db_pardir, exist_ok=True)
-    args = ['makeblastdb', '-dbtype', 'nucl', '-out', db_basepath, '-in', references]
+    args = ['makeblastdb', '-dbtype', 'nucl', '-out', db_basepath, '-in', refspath]
     result = subprocess.run(
         args=args,
         stderr=subprocess.PIPE,
@@ -51,9 +52,9 @@ def make_db(references: str, dbdir: str):
         raise RuntimeError(f"Error building BLAST database: {result.stderr or '<no stderr>'} (returncode {result.returncode})")
 
 
-def check_db(references: str, dbdir: str) -> bool:
+def check_db(refspath: str, dbdir: str) -> bool:
     """Whether the BLAST database for the references exists and is up-to-date."""
-    db_basepath = get_db_basepath(references=references, dbdir=dbdir)
+    db_basepath = get_db_basepath(refspath=refspath, dbdir=dbdir)
     testpath = f"{db_basepath}.nhr"  # The 'header' file
     try:
         db_mtime = os.path.getmtime(testpath)
@@ -61,26 +62,26 @@ def check_db(references: str, dbdir: str) -> bool:
         return False  # Does not exist
     else:
         try:
-            refs_mtime = os.path.getmtime(references)
+            refs_mtime = os.path.getmtime(refspath)
         except OSError as e:
-            raise RuntimeError(f"Invalid references filepath '{references}': {e}")
+            raise RuntimeError(f"Invalid references filepath '{refspath}': {e}")
         if refs_mtime > db_mtime:
             return False  # DB is outdated
     return True
 
 
-def get_db_basepath(references: str, dbdir: str) -> str:
+def get_db_basepath(refspath: str, dbdir: str) -> str:
     """Get a unique, reproducible, safe database path for a given filepath."""
-    unique = str(uuid.uuid5(namespace=uuid.NAMESPACE_URL, name=references))
+    unique = str(uuid.uuid5(namespace=uuid.NAMESPACE_URL, name=refspath))
     basename = f"db_{unique}"  # Prefixed to ensure it doesn't start with a digit
     return os.path.join(dbdir, basename)
 
 
-def ensure_db(references: str, dbdir: str) -> str:
+def ensure_db(refspath: str, dbdir: str) -> str:
     """Ensure a database for the given references exists in the database directory, and get the base path of the database files."""
-    if not check_db(references=references, dbdir=dbdir):
-        make_db(references=references, dbdir=dbdir)
-    return get_db_basepath(references=references, dbdir=dbdir)
+    if not check_db(refspath=refspath, dbdir=dbdir):
+        make_db(refspath=refspath, dbdir=dbdir)
+    return get_db_basepath(refspath=refspath, dbdir=dbdir)
 
 
 #

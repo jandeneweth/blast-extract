@@ -5,20 +5,11 @@ Blast result related objects.
 import typing as t
 import collections
 
-import Bio.Seq
+from blast_extract import seqtools
 
 GAPCHAR = '-'  # Assume dash used for length-1 gap (in IUPAC actually specified as undefined length)
 _BLAST_OUTFIELDS = ['qacc', 'sacc', 'qstart', 'qend', 'sstart', 'send', 'qseq', 'sseq', 'slen']
 _RawBlastResult = collections.namedtuple('BlastResult', _BLAST_OUTFIELDS)
-
-
-class Contig:
-
-    def __init__(self, name: str, fwdseq: str):
-        self.name = name
-        self.fwdseq = fwdseq.upper()
-        self.revseq = Bio.Seq.reverse_complement(self.fwdseq)
-        self.length = len(self.fwdseq)
 
 
 class BlastResult:
@@ -36,7 +27,7 @@ class BlastResult:
             qseq: str,
             sseq: str,
             slen: int,
-            qcontig: Contig,
+            qcontig: 'seqtools.Contig',
     ):
         self.qacc = qacc
         self.sacc = sacc
@@ -74,7 +65,7 @@ class BlastResult:
         return self._perc_cov
 
     @classmethod
-    def from_output(cls, output: str, contig_mapping: dict[str, 'Contig']) -> t.Generator['BlastResult', None, None]:
+    def from_output(cls, output: str, contig_mapping: dict[str, 'seqtools.Contig']) -> t.Generator['BlastResult', None, None]:
         """Create results from blastn output."""
         for line in output.splitlines():
             fields = line.split('\t')
@@ -128,8 +119,8 @@ class BlastResult:
 
     @staticmethod
     def _revcomp_result(result: 'BlastResult') -> 'BlastResult':
-        new_qseq = Bio.Seq.reverse_complement(result.qseq)
-        new_sseq = Bio.Seq.reverse_complement(result.sseq)
+        new_qseq = seqtools.reverse_complement(result.qseq)
+        new_sseq = seqtools.reverse_complement(result.sseq)
         return BlastResult(
             qacc=result.qacc,
             sacc=result.sacc,

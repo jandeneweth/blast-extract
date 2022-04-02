@@ -8,15 +8,13 @@ import sys
 import argparse
 import typing as t
 
-import Bio.Seq
-import Bio.SeqIO
-
+from blast_extract import seqtools
 from blast_extract import blasting
 from blast_extract import blastresult
 
 
 def run(
-    references: str,
+    refspath: str,
     genome: t.TextIO,
     dbdir: str,
     out: t.TextIO,
@@ -25,9 +23,9 @@ def run(
     min_perc_cov: float,
 ):
     dbdir = os.path.abspath(os.path.expanduser(os.path.expandvars(dbdir)))
-    db_basepath = blasting.ensure_db(references=references, dbdir=dbdir)
-    contig_mapping = parse_genome_contigs(genome=genome, fsep=fsep)
-    contig_fasta = make_contigs_fasta(contigs=contig_mapping.values())
+    db_basepath = blasting.ensure_db(refspath=refspath, dbdir=dbdir)
+    contig_mapping = seqtools.parse_genome_contigs(genome=genome, fsep=fsep)
+    contig_fasta = seqtools.make_contigs_fasta(contigs=contig_mapping.values())
     results = blasting.run_blast(db_basepath=db_basepath, query=contig_fasta, contig_mapping=contig_mapping)
     results = (r.normalize_and_extend() for r in results)
     results = filter_blast_results(results=results, min_perc_ident=min_perc_ident, min_perc_cov=min_perc_cov)
@@ -44,28 +42,11 @@ def filter_blast_results(results: t.Iterable['blastresult.BlastResult'], min_per
         yield result
 
 
-def make_contigs_fasta(contigs: t.Iterable['blastresult.Contig']) -> str:
-    result = ''
-    for contig in contigs:
-        result += f">{contig.name}\n{contig.fwdseq}\n"
-    return result
-
-
-def parse_genome_contigs(genome: t.TextIO, fsep) -> dict[str, 'blastresult.Contig']:
-    """Parse a genome fasta file into a mapping of contig names and sequences."""
-    contig_mapping = dict()
-    for seqrecord in Bio.SeqIO.parse(genome, 'fasta'):
-        name = seqrecord.description.split(fsep, 1)[0]  # First value in header assumed to be contig name
-        seq = str(seqrecord.seq).lower()
-        contig_mapping[name] = blastresult.Contig(name=name, fwdseq=seq)
-    return contig_mapping
-
-
 # -- Run as Script --
 
 def get_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--references', '-r', help='The reference alleles FASTA file')
+    parser.add_argument('--references', '-r', help='The reference alleles FASTA filepath')
     parser.add_argument('--dbdir', '-d', default=os.getcwd(), help="The directory for BLAST databases, defaults to working directory")
     parser.add_argument('--out', '-o', type=argparse.FileType('w'), default=sys.stdout, help="The output destination, defaults to STDOUT")
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
@@ -79,7 +60,7 @@ def main(args: list[str] | None = None):
     parser = get_argparser()
     ns = parser.parse_args(args=args)
     run(
-        references=ns.references,
+        refspath=ns.references,
         genome=ns.genome,
         dbdir=ns.dbdir,
         out=ns.out,
