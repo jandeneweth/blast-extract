@@ -1,5 +1,9 @@
 # IDEs
+.vscode/
 .idea/
+
+# Build
+dist/
 
 # Python virtual environment
 venv/

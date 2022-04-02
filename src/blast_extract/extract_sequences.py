@@ -308,7 +308,7 @@ def get_argparser():
     return parser
 
 
-def main(args: list[str]):
+def main(args: list[str] | None = None):
     parser = get_argparser()
     ns = parser.parse_args(args=args)
     run(
@@ -323,7 +323,7 @@ def main(args: list[str]):
 
 
 if __name__ == '__main__':
-    main(args=sys.argv[1:])
+    main()
 
 #
 #

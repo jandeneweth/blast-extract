@@ -15,8 +15,8 @@ RUN python3 -m pip install --no-cache-dir -r requirements.txt
 RUN rm requirements.txt
 
 # Add pipeline scripts
-# DEBUG: mount the scripts directory for latest versions!
-#COPY ./scripts ./scripts
+# DEBUG: mount a site-packages directory for latest versions without re-building image!
+ENV PYTHONPATH "${PYTHONPATH}:/usr/src/app/site-packages"
 
 
 ENTRYPOINT []
