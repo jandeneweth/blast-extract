@@ -64,6 +64,16 @@ class BlastResult:
             self._perc_ident, self._perc_cov = self._calc_perc_ident_cov()
         return self._perc_cov
 
+    @property
+    def blast_header(self):
+        """Get a BLAST header string for the result, excluding the '>'."""
+        return (
+            f"{self.sacc} subject={self.sacc};query={self.qacc};"
+            f"pident={self.perc_ident:.2f};pcov={self.perc_cov:.2f};"
+            f"qstart={self.qstart};qend={self.qend};"
+            f"sstart={self.sstart};send={self.send};"
+        )
+
     @classmethod
     def from_output(cls, output: str, contig_mapping: dict[str, 'seqtools.Sequence']) -> t.Generator['BlastResult', None, None]:
         """Create results from blastn output."""

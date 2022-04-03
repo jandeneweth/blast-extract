@@ -34,7 +34,7 @@ def run(
         results = (r.extend() for r in results)
     results = filter_blast_results(results=results, min_perc_ident=min_perc_ident, min_perc_cov=min_perc_cov)
     for result in results:
-        out.write(f">{result.sacc}\n{result.qseq}\n")
+        out.write(f">{result.blast_header}\n{result.qseq}\n")
 
 
 def filter_blast_results(results: t.Iterable['blastresult.BlastResult'], min_perc_ident: float, min_perc_cov: float) -> t.Iterable['blastresult.BlastResult']:
