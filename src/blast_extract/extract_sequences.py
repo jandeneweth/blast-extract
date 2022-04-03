@@ -2,6 +2,7 @@
 Extract alleles from a FASTA input file based on reference loci.
 """
 
+import collections
 import os
 import sys
 import argparse
@@ -21,7 +22,8 @@ def run(
     min_perc_ident: float,
     min_perc_cov: float,
     do_normalize: bool = True,
-    do_extend: bool = True
+    do_extend: bool = True,
+    filter_best_abbrev: str = 'W',
 ):
     dbdir = os.path.abspath(os.path.expanduser(os.path.expandvars(dbdir)))
     db_basepath = blasting.ensure_db(refspath=refspath, dbdir=dbdir)
@@ -32,6 +34,9 @@ def run(
         results = (r.normalize() for r in results)
     if do_extend:
         results = (r.extend() for r in results)
+    filter_best_func = filter_best_func_map[filter_best_abbrev]
+    if filter_best_func:
+        results = filter_best_results(results=results, key_func=filter_best_func)
     results = filter_blast_results(results=results, min_perc_ident=min_perc_ident, min_perc_cov=min_perc_cov)
     for result in results:
         out.write(f">{result.blast_header}\n{result.qseq}\n")
@@ -46,6 +51,24 @@ def filter_blast_results(results: t.Iterable['blastresult.BlastResult'], min_per
         yield result
 
 
+def filter_best_results(
+    results: t.Iterable['blastresult.BlastResult'],
+    key_func: t.Callable[['blastresult.BlastResult'], float],
+) -> list['blastresult.BlastResult']:
+    resmap: dict[str, list['blastresult.BlastResult']] = collections.defaultdict(list)
+    for result in results:
+        resmap[result.sacc].append(result)
+    return [max(rs, key=key_func) for rs in resmap.values()]
+
+
+filter_best_func_map = {
+    'N': None,
+    'W': (lambda r: r.perc_ident * r.perc_cov),
+    'P': (lambda r: r.perc_ident),
+    'C': (lambda r: r.perc_cov),
+}
+
+
 # -- Run as Script --
 
 def get_argparser():
@@ -56,6 +79,7 @@ def get_argparser():
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
     parser.add_argument('--normalize', default='Y', type=str, choices=['Y', 'N'], help="Normalize results to the 'plus' strand of the reference")
     parser.add_argument('--extend', default='Y', type=str, choices=['Y', 'N'], help="Extend results to cover as much as possible of the reference, implies `normalize`")
+    parser.add_argument('--best', default='W', type=str, choices=['N', 'W'], help="Whether and how to filter for the best matches. N: No filtering. W: pident*pcov. P: pident. C: coverage.")
     parser.add_argument('--pident', default=80.0, type=float, help="Minimum percent identity for results")
     parser.add_argument('--pcov', default=80.0, type=float, help="Minimum percent coverage for results")
     parser.add_argument('GENOME', help='The FASTA format input assembled genome, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
@@ -77,6 +101,7 @@ def main(args: list[str] | None = None):
         min_perc_cov=ns.pcov,
         do_normalize=do_normalize,
         do_extend=do_extend,
+        filter_best_abbrev=ns.best,
     )
 
 
