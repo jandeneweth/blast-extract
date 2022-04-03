@@ -53,7 +53,7 @@ def run(fh: t.TextIO, out: t.TextIO, algorithm: str = 'md5', hash_trim: int | No
 # -- Run as Script --
 
 def get_argparser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Hash sequences from a multi-FASTA file.", epilog="Copyright (C) 2022 Jan Deneweth")
     parser.add_argument('--algorithm', '-a', default='sha1', type=str, help="The hashing algorithm used")
     parser.add_argument('--hash_trim', '-t', default=None, type=int, help="If specified, the hexadecimal representation of the output hashes are trimmed to the first X characters")
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")

@@ -49,7 +49,7 @@ def filter_blast_results(results: t.Iterable['blastresult.BlastResult'], min_per
 # -- Run as Script --
 
 def get_argparser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Extract subsequences from a genome using BLAST.", epilog="Copyright (C) 2022 Jan Deneweth")
     parser.add_argument('--references', '-r', help='The reference alleles FASTA filepath')
     parser.add_argument('--dbdir', '-d', default=os.getcwd(), help="The directory for BLAST databases, defaults to working directory")
     parser.add_argument('--out', '-o', type=argparse.FileType('w'), default=sys.stdout, help="The output destination, defaults to STDOUT")
