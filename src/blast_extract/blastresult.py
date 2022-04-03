@@ -213,8 +213,8 @@ class BlastResult:
         else:
             raise AssertionError("Unhandled strand")
         # Extend query and ref sequences, the latter one with gaps (dashes)
-        new_qseq = qext + result.qseq
-        new_sseq = sext + result.sseq
+        new_qseq = result.qseq + qext
+        new_sseq = result.sseq + sext
         # Return new result
         return BlastResult(
             qacc=result.qacc,
