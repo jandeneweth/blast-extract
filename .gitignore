@@ -4,9 +4,10 @@
 
 # Build
 dist/
+**/*.egg-info/
 
 # Python virtual environment
 venv/
 
 internal/
-tests/
+testdata/
