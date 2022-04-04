@@ -72,7 +72,16 @@ filter_best_func_map = {
 # -- Run as Script --
 
 def get_argparser():
-    parser = argparse.ArgumentParser(description="Extract subsequences from a genome using BLAST.", epilog="Copyright (C) 2022 Jan Deneweth")
+    parser = argparse.ArgumentParser(
+        prog="extract-sequences",
+        description="Extract subsequences from a genome using BLAST.",
+        epilog="Copyright (C) 2022 Jan Deneweth"
+    )
+    add_argparser_args(parser=parser)
+    return parser
+
+
+def add_argparser_args(parser: argparse.ArgumentParser):
     parser.add_argument('--references', '-r', help='The reference alleles FASTA filepath')
     parser.add_argument('--dbdir', '-d', default=os.getcwd(), help="The directory for BLAST databases, defaults to working directory")
     parser.add_argument('--out', '-o', type=argparse.FileType('w'), default=sys.stdout, help="The output destination, defaults to STDOUT")
@@ -83,12 +92,9 @@ def get_argparser():
     parser.add_argument('--pident', default=80.0, type=float, help="Minimum percent identity for results")
     parser.add_argument('--pcov', default=80.0, type=float, help="Minimum percent coverage for results")
     parser.add_argument('GENOME', help='The FASTA format input assembled genome, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
-    return parser
 
 
-def main(args: list[str] | None = None):
-    parser = get_argparser()
-    ns = parser.parse_args(args=args)
+def main_ns(ns: argparse.Namespace):
     do_extend = True if ns.extend == 'Y' else False
     do_normalize = (True if ns.normalize == 'Y' else False) or do_extend
     run(
@@ -103,6 +109,12 @@ def main(args: list[str] | None = None):
         do_extend=do_extend,
         filter_best_abbrev=ns.best,
     )
+
+
+def main(args: list[str] | None = None):
+    parser = get_argparser()
+    ns = parser.parse_args(args=args)
+    main_ns(ns=ns)
 
 
 if __name__ == '__main__':

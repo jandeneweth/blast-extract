@@ -53,19 +53,25 @@ def run(fh: t.TextIO, out: t.TextIO, algorithm: str = 'md5', hash_trim: int | No
 # -- Run as Script --
 
 def get_argparser():
-    parser = argparse.ArgumentParser(description="Hash sequences from a multi-FASTA file.", epilog="Copyright (C) 2022 Jan Deneweth")
+    parser = argparse.ArgumentParser(
+        prog="hash-sequences",
+        description="Hash sequences from a multi-FASTA file.",
+        epilog="Copyright (C) 2022 Jan Deneweth"
+    )
+    add_argparser_args(parser=parser)
+    return parser
+
+
+def add_argparser_args(parser: argparse.ArgumentParser):
     parser.add_argument('--algorithm', '-a', default='sha1', type=str, help="The hashing algorithm used")
     parser.add_argument('--hash_trim', '-t', default=None, type=int, help="If specified, the hexadecimal representation of the output hashes are trimmed to the first X characters")
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
     parser.add_argument('--field', '-f', default=1, type=int, help="The field in which the sequence name can be found")
     parser.add_argument('--out', '-o', type=argparse.FileType('w'), default=sys.stdout, help="The output destination, defaults to STDOUT")
     parser.add_argument('SEQUENCES', help='The FASTA format input of sequences, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
-    return parser
 
 
-def main(args: list[str] | None = None):
-    parser = get_argparser()
-    ns = parser.parse_args(args=args)
+def main_ns(ns: argparse.Namespace):
     run(
         fh=ns.SEQUENCES,
         out=ns.out,
@@ -74,6 +80,12 @@ def main(args: list[str] | None = None):
         fsep=ns.fsep,
         field=ns.field,
     )
+
+
+def main(args: list[str] | None = None):
+    parser = get_argparser()
+    ns = parser.parse_args(args=args)
+    main_ns(ns=ns)
 
 
 if __name__ == '__main__':
