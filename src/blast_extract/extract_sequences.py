@@ -63,9 +63,9 @@ def filter_best_results(
 
 filter_best_func_map = {
     'N': None,
-    'W': (lambda r: r.perc_ident * r.perc_cov),
-    'P': (lambda r: r.perc_ident),
-    'C': (lambda r: r.perc_cov),
+    'W': (lambda r: (r.perc_ident * r.perc_cov, r.perc_ident)),
+    'P': (lambda r: (r.perc_ident, r.perc_cov)),
+    'C': (lambda r: (r.perc_cov, r.perc_ident)),
 }
 
 
