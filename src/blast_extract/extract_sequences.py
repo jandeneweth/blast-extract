@@ -88,7 +88,7 @@ def add_argparser_args(parser: argparse.ArgumentParser):
     parser.add_argument('--fsep', '-s', default=' ', type=str, help="The character(s) separating fields in the fasta headers")
     parser.add_argument('--normalize', default='Y', type=str, choices=['Y', 'N'], help="Normalize results to the 'plus' strand of the reference")
     parser.add_argument('--extend', default='Y', type=str, choices=['Y', 'N'], help="Extend results to cover as much as possible of the reference, implies `normalize`")
-    parser.add_argument('--best', default='W', type=str, choices=['N', 'W'], help="Whether and how to filter for the best matches. N: No filtering. W: pident*pcov. P: pident. C: coverage.")
+    parser.add_argument('--best', default='W', type=str, choices=['N', 'W', 'P', 'C'], help="Whether and how to filter for the best matches. N: No filtering. W: pident*pcov. P: pident. C: coverage.")
     parser.add_argument('--pident', default=80.0, type=float, help="Minimum percent identity for results")
     parser.add_argument('--pcov', default=80.0, type=float, help="Minimum percent coverage for results")
     parser.add_argument('GENOME', help='The FASTA format input assembled genome, defaults to STDIN', type=argparse.FileType('r'), default=sys.stdin)
